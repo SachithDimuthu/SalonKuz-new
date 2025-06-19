@@ -475,6 +475,148 @@ class Booking {
         
         return $row['count'] == 0;
     }
+
+    public function getFilteredBookings($filters = [], $limit = null, $offset = null) {
+        $query = "
+            SELECT b.*,
+                   u.first_name as user_first_name, u.last_name as user_last_name, u.email as user_email,
+                   e.first_name as employee_first_name, e.last_name as employee_last_name,
+                   s.name as service_name, s.price as service_price, s.duration as service_duration,
+                   d.title as deal_title, d.discount_percentage
+            FROM bookings b
+            JOIN users u ON b.user_id = u.id
+            JOIN users e ON b.employee_id = e.id
+            JOIN services s ON b.service_id = s.id
+            LEFT JOIN deals d ON b.deal_id = d.id
+            WHERE 1=1
+        ";
+        $params = [];
+        $types = "";
+
+        if (!empty($filters['status'])) {
+            $query .= " AND b.status = ?";
+            $params[] = $filters['status'];
+            $types .= "s";
+        }
+        if (!empty($filters['service_id'])) {
+            $query .= " AND b.service_id = ?";
+            $params[] = (int)$filters['service_id'];
+            $types .= "i";
+        }
+        if (!empty($filters['employee_id'])) {
+            $query .= " AND b.employee_id = ?";
+            $params[] = (int)$filters['employee_id'];
+            $types .= "i";
+        }
+        if (!empty($filters['date_from'])) {
+            $query .= " AND b.booking_date >= ?";
+            $params[] = $filters['date_from'];
+            $types .= "s";
+        }
+        if (!empty($filters['date_to'])) {
+            $query .= " AND b.booking_date <= ?";
+            $params[] = $filters['date_to'];
+            $types .= "s";
+        }
+        if (!empty($filters['search'])) {
+            $searchTerm = "%" . $filters['search'] . "%";
+            $query .= " AND (CONCAT(u.first_name, ' ', u.last_name) LIKE ? OR u.email LIKE ?)";
+            $params[] = $searchTerm;
+            $params[] = $searchTerm;
+            $types .= "ss";
+        }
+
+        $query .= " ORDER BY b.booking_date DESC, b.booking_time DESC";
+
+        if ($limit !== null) {
+            $query .= " LIMIT ?";
+            $params[] = (int)$limit;
+            $types .= "i";
+            if ($offset !== null) {
+                $query .= " OFFSET ?";
+                $params[] = (int)$offset;
+                $types .= "i";
+            }
+        }
+
+        $stmt = $this->conn->prepare($query);
+        if (!$stmt) {
+             error_log("Prepare failed: (" . $this->conn->errno . ") " . $this->conn->error);
+             return [];
+        }
+        if (!empty($params)) {
+            $stmt->bind_param($types, ...$params);
+        }
+        if (!$stmt->execute()) {
+            error_log("Execute failed: (" . $stmt->errno . ") " . $stmt->error);
+            return [];
+        }
+        $result = $stmt->get_result();
+        return $result->fetch_all(MYSQLI_ASSOC);
+    }
+
+    public function countFilteredBookings($filters = []) {
+        $query = "
+            SELECT COUNT(b.id) as total
+            FROM bookings b
+            JOIN users u ON b.user_id = u.id
+            JOIN users e ON b.employee_id = e.id
+            JOIN services s ON b.service_id = s.id
+            LEFT JOIN deals d ON b.deal_id = d.id
+            WHERE 1=1
+        ";
+        $params = [];
+        $types = "";
+
+        if (!empty($filters['status'])) {
+            $query .= " AND b.status = ?";
+            $params[] = $filters['status'];
+            $types .= "s";
+        }
+        if (!empty($filters['service_id'])) {
+            $query .= " AND b.service_id = ?";
+            $params[] = (int)$filters['service_id'];
+            $types .= "i";
+        }
+        if (!empty($filters['employee_id'])) {
+            $query .= " AND b.employee_id = ?";
+            $params[] = (int)$filters['employee_id'];
+            $types .= "i";
+        }
+        if (!empty($filters['date_from'])) {
+            $query .= " AND b.booking_date >= ?";
+            $params[] = $filters['date_from'];
+            $types .= "s";
+        }
+        if (!empty($filters['date_to'])) {
+            $query .= " AND b.booking_date <= ?";
+            $params[] = $filters['date_to'];
+            $types .= "s";
+        }
+        if (!empty($filters['search'])) {
+            $searchTerm = "%" . $filters['search'] . "%";
+            $query .= " AND (CONCAT(u.first_name, ' ', u.last_name) LIKE ? OR u.email LIKE ?)";
+            $params[] = $searchTerm;
+            $params[] = $searchTerm;
+            $types .= "ss";
+        }
+
+        $stmt = $this->conn->prepare($query);
+        if (!$stmt) {
+             error_log("Prepare failed for count: (" . $this->conn->errno . ") " . $this->conn->error);
+             return 0;
+        }
+        if (!empty($params)) {
+            $stmt->bind_param($types, ...$params);
+        }
+        if (!$stmt->execute()) {
+            error_log("Execute failed for count: (" . $stmt->errno . ") " . $stmt->error);
+            return 0;
+        }
+        $result = $stmt->get_result();
+        $row = $result->fetch_assoc();
+        return $row['total'] ? (int)$row['total'] : 0;
+    }
     
     /**
      * Get available time slots for an employee on a specific date
@@ -785,6 +927,89 @@ class Booking {
             'by_category' => $byCategory,
             'by_date' => $byDate
         ];
+    }
+
+    /**
+     * Get total revenue from all confirmed or completed bookings.
+     *
+     * @return float Total revenue.
+     */
+    public function getTotalRevenue() {
+        try {
+            $stmt = $this->conn->prepare("
+                SELECT
+                    SUM(
+                        CASE
+                            WHEN b.deal_id IS NOT NULL AND d.discount_percentage IS NOT NULL THEN s.price * (1 - d.discount_percentage / 100)
+                            ELSE s.price
+                        END
+                    ) as total_revenue
+                FROM bookings b
+                JOIN services s ON b.service_id = s.id
+                LEFT JOIN deals d ON b.deal_id = d.id
+                WHERE b.status IN ('confirmed', 'completed')
+            ");
+
+            if (!$stmt) {
+                throw new Exception("Error preparing statement for total revenue: " . $this->conn->error);
+            }
+
+            if (!$stmt->execute()) {
+                throw new Exception("Error executing statement for total revenue: " . $stmt->error);
+            }
+
+            $result = $stmt->get_result();
+            $row = $result->fetch_assoc();
+
+            return $row['total_revenue'] ? (float)$row['total_revenue'] : 0.0;
+        } catch (Exception $e) {
+            error_log('Get total revenue error: ' . $e->getMessage());
+            return 0.0; // Return 0.0 in case of error
+        }
+    }
+
+    /**
+     * Get revenue for a specific period from confirmed or completed bookings.
+     *
+     * @param string $startDate Start date (YYYY-MM-DD)
+     * @param string $endDate End date (YYYY-MM-DD)
+     * @return float Revenue for the period.
+     */
+    public function getRevenueByPeriod($startDate, $endDate) {
+        try {
+            $stmt = $this->conn->prepare("
+                SELECT
+                    SUM(
+                        CASE
+                            WHEN b.deal_id IS NOT NULL AND d.discount_percentage IS NOT NULL THEN s.price * (1 - d.discount_percentage / 100)
+                            ELSE s.price
+                        END
+                    ) as period_revenue
+                FROM bookings b
+                JOIN services s ON b.service_id = s.id
+                LEFT JOIN deals d ON b.deal_id = d.id
+                WHERE b.status IN ('confirmed', 'completed')
+                AND b.booking_date BETWEEN ? AND ?
+            ");
+
+            if (!$stmt) {
+                throw new Exception("Error preparing statement for revenue by period: " . $this->conn->error);
+            }
+
+            $stmt->bind_param("ss", $startDate, $endDate);
+
+            if (!$stmt->execute()) {
+                throw new Exception("Error executing statement for revenue by period: " . $stmt->error);
+            }
+
+            $result = $stmt->get_result();
+            $row = $result->fetch_assoc();
+
+            return $row['period_revenue'] ? (float)$row['period_revenue'] : 0.0;
+        } catch (Exception $e) {
+            error_log('Get revenue by period error: ' . $e->getMessage());
+            return 0.0; // Return 0.0 in case of error
+        }
     }
 }
 ?>

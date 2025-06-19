@@ -459,5 +459,95 @@ class User {
         
         return $serviceIds;
     }
+
+    public function getFilteredUsers($filters = [], $limit = null, $offset = null) {
+        $query = "SELECT * FROM users WHERE 1=1";
+        $params = [];
+        $types = "";
+
+        if (!empty($filters['role'])) {
+            $query .= " AND role = ?";
+            $params[] = $filters['role'];
+            $types .= "s";
+        }
+
+        if (!empty($filters['search'])) {
+            $searchTerm = "%" . $filters['search'] . "%";
+            $query .= " AND (CONCAT(first_name, ' ', last_name) LIKE ? OR username LIKE ? OR email LIKE ? OR phone LIKE ?)";
+            $params[] = $searchTerm;
+            $params[] = $searchTerm;
+            $params[] = $searchTerm;
+            $params[] = $searchTerm;
+            $types .= "ssss";
+        }
+
+        $query .= " ORDER BY id DESC";
+
+        if ($limit !== null) {
+            $query .= " LIMIT ?";
+            $params[] = (int)$limit;
+            $types .= "i";
+            if ($offset !== null) {
+                $query .= " OFFSET ?";
+                $params[] = (int)$offset;
+                $types .= "i";
+            }
+        }
+
+        $stmt = $this->conn->prepare($query);
+        if (!$stmt) {
+            // Handle error, e.g., log or return empty array
+            error_log('MySQLi prepare failed: ' . $this->conn->error . ' Query: ' . $query);
+            return [];
+        }
+        if (!empty($params)) {
+            $stmt->bind_param($types, ...$params);
+        }
+        if (!$stmt->execute()) {
+            error_log('MySQLi execute failed: ' . $stmt->error);
+            return [];
+        }
+        $result = $stmt->get_result();
+        return $result->fetch_all(MYSQLI_ASSOC);
+    }
+
+    public function countFilteredUsers($filters = []) {
+        $query = "SELECT COUNT(*) as total FROM users WHERE 1=1";
+        $params = [];
+        $types = "";
+
+        if (!empty($filters['role'])) {
+            $query .= " AND role = ?";
+            $params[] = $filters['role'];
+            $types .= "s";
+        }
+
+        if (!empty($filters['search'])) {
+            $searchTerm = "%" . $filters['search'] . "%";
+            $query .= " AND (CONCAT(first_name, ' ', last_name) LIKE ? OR username LIKE ? OR email LIKE ? OR phone LIKE ?)";
+            $params[] = $searchTerm;
+            $params[] = $searchTerm;
+            $params[] = $searchTerm;
+            $params[] = $searchTerm;
+            $types .= "ssss";
+        }
+
+        $stmt = $this->conn->prepare($query);
+        if (!$stmt) {
+            // Handle error, e.g., log or return 0
+            error_log('MySQLi prepare failed: ' . $this->conn->error . ' Query: ' . $query);
+            return 0;
+        }
+        if (!empty($params)) {
+            $stmt->bind_param($types, ...$params);
+        }
+        if (!$stmt->execute()) {
+            error_log('MySQLi execute failed: ' . $stmt->error);
+            return 0;
+        }
+        $result = $stmt->get_result();
+        $row = $result->fetch_assoc();
+        return $row['total'] ? (int)$row['total'] : 0;
+    }
 }
 ?>

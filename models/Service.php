@@ -196,11 +196,11 @@ class Service {
     }
     
     /**
-     * Get service categories
+     * Get all service categories
      * 
      * @return array Array of categories
      */
-    public function getServiceCategories() {
+    public function getAllCategories() { // Renamed from getServiceCategories
         // Execute query
         $result = $this->conn->query("SELECT DISTINCT category FROM services ORDER BY category ASC");
         $categories = [];
@@ -210,6 +210,133 @@ class Service {
         }
         
         return $categories;
+    }
+
+    public function serviceHasBookings($serviceId) {
+        $stmt = $this->conn->prepare("SELECT COUNT(*) as count FROM bookings WHERE service_id = ?");
+        if (!$stmt) {
+            error_log("Prepare failed for serviceHasBookings: (" . $this->conn->errno . ") " . $this->conn->error);
+            return false; // Or throw an exception
+        }
+        $stmt->bind_param("i", $serviceId);
+        if (!$stmt->execute()) {
+            error_log("Execute failed for serviceHasBookings: (" . $stmt->errno . ") " . $stmt->error);
+            return false; // Or throw an exception
+        }
+        $result = $stmt->get_result();
+        $row = $result->fetch_assoc();
+        return ($row['count'] > 0);
+    }
+
+    public function getFilteredServices($filters = [], $limit = null, $offset = null) {
+        $query = "SELECT * FROM services WHERE 1=1";
+        $params = [];
+        $types = "";
+
+        if (!empty($filters['category'])) {
+            $query .= " AND category = ?";
+            $params[] = $filters['category'];
+            $types .= "s";
+        }
+        // Assuming 'is_active' is a TINYINT(1) or similar column in your 'services' table
+        if (isset($filters['status']) && $filters['status'] !== '') { // Check for empty string too
+            $query .= " AND is_active = ?"; // Ensure your table has 'is_active'
+            $params[] = (int)$filters['status']; // 1 for active, 0 for inactive
+            $types .= "i";
+        }
+        if (!empty($filters['search'])) {
+            $searchTerm = "%" . $filters['search'] . "%";
+            $query .= " AND (name LIKE ? OR description LIKE ?)";
+            $params[] = $searchTerm;
+            $params[] = $searchTerm;
+            $types .= "ss";
+        }
+
+        $query .= " ORDER BY name ASC";
+
+        if ($limit !== null) {
+            $query .= " LIMIT ?";
+            $params[] = (int)$limit;
+            $types .= "i";
+            if ($offset !== null) {
+                $query .= " OFFSET ?";
+                $params[] = (int)$offset;
+                $types .= "i";
+            }
+        }
+
+        $stmt = $this->conn->prepare($query);
+         if (!$stmt) {
+             error_log("Prepare failed for getFilteredServices: (" . $this->conn->errno . ") " . $this->conn->error);
+             return [];
+        }
+        if (!empty($params)) {
+            $stmt->bind_param($types, ...$params);
+        }
+        if (!$stmt->execute()) {
+            error_log("Execute failed for getFilteredServices: (" . $stmt->errno . ") " . $stmt->error);
+            return [];
+        }
+        $result = $stmt->get_result();
+        return $result->fetch_all(MYSQLI_ASSOC);
+    }
+
+    public function countFilteredServices($filters = []) {
+        $query = "SELECT COUNT(*) as total FROM services WHERE 1=1";
+        $params = [];
+        $types = "";
+
+        if (!empty($filters['category'])) {
+            $query .= " AND category = ?";
+            $params[] = $filters['category'];
+            $types .= "s";
+        }
+        if (isset($filters['status']) && $filters['status'] !== '') {
+            $query .= " AND is_active = ?"; // Ensure your table has 'is_active'
+            $params[] = (int)$filters['status'];
+            $types .= "i";
+        }
+        if (!empty($filters['search'])) {
+            $searchTerm = "%" . $filters['search'] . "%";
+            $query .= " AND (name LIKE ? OR description LIKE ?)";
+            $params[] = $searchTerm;
+            $params[] = $searchTerm;
+            $types .= "ss";
+        }
+
+        $stmt = $this->conn->prepare($query);
+        if (!$stmt) {
+             error_log("Prepare failed for countFilteredServices: (" . $this->conn->errno . ") " . $this->conn->error);
+             return 0;
+        }
+        if (!empty($params)) {
+            $stmt->bind_param($types, ...$params);
+        }
+        if (!$stmt->execute()) {
+            error_log("Execute failed for countFilteredServices: (" . $stmt->errno . ") " . $stmt->error);
+            return 0;
+        }
+        $result = $stmt->get_result();
+        $row = $result->fetch_assoc();
+        return $row['total'] ? (int)$row['total'] : 0;
+    }
+
+    public function countServicesByStatus($isActive) {
+        $query = "SELECT COUNT(*) as total FROM services WHERE is_active = ?"; // Ensure 'is_active' column
+        $stmt = $this->conn->prepare($query);
+        if (!$stmt) {
+            error_log("Prepare failed for countServicesByStatus: (" . $this->conn->errno . ") " . $this->conn->error);
+            return 0;
+        }
+        $isActiveInt = (int)$isActive;
+        $stmt->bind_param("i", $isActiveInt);
+        if (!$stmt->execute()) {
+            error_log("Execute failed for countServicesByStatus: (" . $stmt->errno . ") " . $stmt->error);
+            return 0;
+        }
+        $result = $stmt->get_result();
+        $row = $result->fetch_assoc();
+        return $row['total'] ? (int)$row['total'] : 0;
     }
     
     /**

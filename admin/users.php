@@ -38,7 +38,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'delete' && isset($_GET['id'])
         setFlashMessage('error', 'You cannot delete your own account.');
     } else {
         // Check if user has bookings
-        $userBookings = $bookingModel->countUserBookings($userId);
+        $userBookings = $bookingModel->countBookings($userId);
         
         if ($userBookings > 0) {
             setFlashMessage('error', 'Cannot delete user with existing bookings. Please cancel all bookings first.');
@@ -82,9 +82,9 @@ $totalUsers = $userModel->countFilteredUsers($filters);
 $totalPages = ceil($totalUsers / $limit);
 
 // Get role counts
-$adminCount = $userModel->countUsersByRole('admin');
-$employeeCount = $userModel->countUsersByRole('employee');
-$customerCount = $userModel->countUsersByRole('customer');
+$adminCount = $userModel->countUsers('admin');
+$employeeCount = $userModel->countUsers('employee');
+$customerCount = $userModel->countUsers('customer');
 ?>
 
 <section class="py-8 bg-gray-100">

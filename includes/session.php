@@ -82,88 +82,65 @@ if (!function_exists('destroySession')) {
  * 
  * @param string $key The flash message key
  * @param string $message The flash message
- * @param string $type The flash message type (success, error, info, warning)
+ * Set a flash message in the session.
+ *
+ * @param string $type The type of message (e.g., 'success', 'error', 'info').
+ * @param string $message The message content.
  * @return void
  */
 if (!function_exists('setFlashMessage')) {
-    function setFlashMessage($key, $message, $type = 'info') {
-    $_SESSION['flash_messages'][$key] = [
-        'message' => $message,
-        'type' => $type
-    ];
+    function setFlashMessage($type, $message) {
+        $_SESSION['flash_messages'][] = [
+            'type' => $type,
+            'message' => $message
+        ];
     }
 }
 
-/**
- * Get a flash message
- * 
- * @param string $key The flash message key
- * @return array|null The flash message or null if it doesn't exist
- */
-if (!function_exists('getFlashMessage')) {
-    function getFlashMessage($key) {
-    if (isset($_SESSION['flash_messages'][$key])) {
-        $flashMessage = $_SESSION['flash_messages'][$key];
-        unset($_SESSION['flash_messages'][$key]);
-        return $flashMessage;
-    }
-    return null;
-    }
-}
-
-/**
- * Check if a flash message exists
- * 
- * @param string $key The flash message key
- * @return bool True if the flash message exists, false otherwise
- */
-if (!function_exists('hasFlashMessage')) {
-    function hasFlashMessage($key) {
-    return isset($_SESSION['flash_messages'][$key]);
-    }
-}
-
-/**
- * Display all flash messages
- * 
- * @return string The HTML for all flash messages
- */
-if (!function_exists('displayFlashMessages')) {
-    function displayFlashMessages() {
-    $output = '';
-    if (isset($_SESSION['flash_messages']) && !empty($_SESSION['flash_messages'])) {
-        foreach ($_SESSION['flash_messages'] as $key => $flashMessage) {
-            $type = $flashMessage['type'];
-            $message = $flashMessage['message'];
-            
-            $bgColor = 'bg-blue-100';
-            $textColor = 'text-blue-700';
-            $borderColor = 'border-blue-400';
-            
-            if ($type === 'success') {
-                $bgColor = 'bg-green-100';
-                $textColor = 'text-green-700';
-                $borderColor = 'border-green-400';
-            } elseif ($type === 'error') {
-                $bgColor = 'bg-red-100';
-                $textColor = 'text-red-700';
-                $borderColor = 'border-red-400';
-            } elseif ($type === 'warning') {
-                $bgColor = 'bg-yellow-100';
-                $textColor = 'text-yellow-700';
-                $borderColor = 'border-yellow-400';
+if (!function_exists('getFlashMessage')) { // Changed from displayFlashMessages to getFlashMessage for consistency with plan
+    /**
+     * Get and display all flash messages.
+     * Once displayed, messages are cleared from the session.
+     *
+     * @return void
+     */
+    function getFlashMessage() { // Changed from displayFlashMessages to getFlashMessage
+        if (isset($_SESSION['flash_messages']) && !empty($_SESSION['flash_messages'])) {
+            $output = '';
+            foreach ($_SESSION['flash_messages'] as $flashMessage) {
+                $alertType = '';
+                switch ($flashMessage['type']) {
+                    case 'success':
+                        $alertType = 'bg-green-100 border-green-400 text-green-700';
+                        break;
+                    case 'error':
+                        $alertType = 'bg-red-100 border-red-400 text-red-700';
+                        break;
+                    case 'info':
+                        $alertType = 'bg-blue-100 border-blue-400 text-blue-700';
+                        break;
+                    case 'warning':
+                        $alertType = 'bg-yellow-100 border-yellow-400 text-yellow-700';
+                        break;
+                    default:
+                        $alertType = 'bg-gray-100 border-gray-400 text-gray-700';
+                        break;
+                }
+                $output .= '<div class="' . $alertType . ' border px-4 py-3 rounded relative mb-4" role="alert">';
+                $output .= '<span class="block sm:inline">' . htmlspecialchars($flashMessage['message'], ENT_QUOTES, 'UTF-8') . '</span>';
+                // Optional: Add a close button
+                // $output .= '<span class="absolute top-0 bottom-0 right-0 px-4 py-3">';
+                // $output .= '<svg class="fill-current h-6 w-6 text-'.$flashMessage['type'].'-500" role="button" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><title>Close</title><path d="M14.348 14.849a1.2 1.2 0 0 1-1.697 0L10 11.819l-2.651 3.029a1.2 1.2 0 1 1-1.697-1.697l2.758-3.15-2.759-3.152a1.2 1.2 0 1 1 1.697-1.697L10 8.183l2.651-3.031a1.2 1.2 0 1 1 1.697 1.697l-2.758 3.152 2.758 3.15a1.2 1.2 0 0 1 0 1.698z"/></svg>';
+                // $output .= '</span>';
+                $output .= '</div>';
             }
-            
-            $output .= '<div class="' . $bgColor . ' border ' . $borderColor . ' ' . $textColor . ' px-4 py-3 rounded relative mb-4" role="alert">
-                            <span class="block sm:inline">' . $message . '</span>
-                        </div>';
-            
-            unset($_SESSION['flash_messages'][$key]);
+            unset($_SESSION['flash_messages']); // Clear messages after displaying
+            echo $output; // Echo the messages
         }
     }
-    return $output;
-    }
 }
+
+// Potentially other session related functions might be here already or can be added later.
 
 /**
  * Set user session after successful login

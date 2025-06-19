@@ -150,7 +150,7 @@ if ($previousMonthRevenue > 0) {
                             </div>
                             <div>
                                 <h3 class="text-lg font-semibold text-gray-700">Active Deals</h3>
-                                <p class="text-2xl font-bold"><?php echo $dealModel->countDeals(true); ?></p>
+                                <p class="text-2xl font-bold"><?php echo $dealModel->countDealsByStatus('active'); ?></p>
                             </div>
                         </div>
                     </div>
@@ -243,7 +243,7 @@ if ($previousMonthRevenue > 0) {
                                                     #<?php echo str_pad($booking['id'], 6, '0', STR_PAD_LEFT); ?>
                                                 </td>
                                                 <td class="py-3 px-4 border-b border-gray-200">
-                                                    <?php echo $booking['user_name']; ?>
+                                                    <?php echo htmlspecialchars($booking['user_first_name'] . ' ' . $booking['user_last_name'], ENT_QUOTES, 'UTF-8'); ?>
                                                 </td>
                                                 <td class="py-3 px-4 border-b border-gray-200">
                                                     <?php echo $booking['service_name']; ?>

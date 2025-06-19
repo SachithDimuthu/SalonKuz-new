@@ -169,6 +169,26 @@ if (!function_exists('formatPrice')) {
 }
 
 /**
+ * Format a time string to a readable format (e.g., HH:MM AM/PM).
+ *
+ * @param string $time The time string to format (HH:MM:SS or HH:MM).
+ * @param string $format The desired output format string for date() function. Defaults to 'h:i A'.
+ * @return string The formatted time string.
+ */
+if (!function_exists('formatTime')) {
+    function formatTime($time, $format = 'h:i A') {
+        if (empty($time)) {
+            return ''; // Or return a default like 'N/A'
+        }
+        $timestamp = strtotime($time);
+        if ($timestamp === false) {
+            return $time; // Return original if strtotime fails
+        }
+        return date($format, $timestamp);
+    }
+}
+
+/**
  * Calculate the discounted price
  * 
  * @param float $price The original price
@@ -272,4 +292,21 @@ if (!function_exists('generatePagination')) {
         return $pagination;
     } // Closes generatePagination function
 } // Closes if (!function_exists('generatePagination'))
+
+if (!function_exists('truncateText')) {
+    /**
+     * Truncate text to a certain length and add ellipsis if needed.
+     *
+     * @param string $text The text to truncate.
+     * @param int $maxLength The maximum length of the text.
+     * @param string $suffix Suffix to append if text is truncated.
+     * @return string The truncated text.
+     */
+    function truncateText($text, $maxLength, $suffix = '...') {
+        if (mb_strlen($text) > $maxLength) {
+            return mb_substr($text, 0, $maxLength - mb_strlen($suffix)) . $suffix;
+        }
+        return $text;
+    }
+}
 ?>

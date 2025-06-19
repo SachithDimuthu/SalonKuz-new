@@ -31,7 +31,7 @@ $userModel = new User($conn);
 $services = $serviceModel->getAllServices();
 
 // Get all employees for filter
-$employees = $userModel->getUsersByRole('employee');
+$employees = $userModel->getAllUsers('employee');
 
 // Handle status update if provided
 if (isset($_GET['id']) && isset($_GET['status']) && in_array($_GET['status'], ['pending', 'confirmed', 'cancelled', 'completed'])) {
@@ -253,14 +253,14 @@ $totalPages = ceil($totalBookings / $limit);
                                                     #<?php echo str_pad($booking['id'], 6, '0', STR_PAD_LEFT); ?>
                                                 </td>
                                                 <td class="py-3 px-4 border-b border-gray-200">
-                                                    <div class="font-semibold"><?php echo $booking['user_name']; ?></div>
-                                                    <div class="text-xs text-gray-500"><?php echo $booking['user_email']; ?></div>
+                                                    <div class="font-semibold"><?php echo htmlspecialchars($booking['user_first_name'] . ' ' . $booking['user_last_name'], ENT_QUOTES, 'UTF-8'); ?></div>
+                                                    <div class="text-xs text-gray-500"><?php echo htmlspecialchars($booking['user_email'], ENT_QUOTES, 'UTF-8'); ?></div>
                                                 </td>
                                                 <td class="py-3 px-4 border-b border-gray-200">
-                                                    <?php echo $booking['service_name']; ?>
+                                                    <?php echo htmlspecialchars($booking['service_name'], ENT_QUOTES, 'UTF-8'); ?>
                                                 </td>
                                                 <td class="py-3 px-4 border-b border-gray-200">
-                                                    <?php echo $booking['employee_name']; ?>
+                                                    <?php echo htmlspecialchars($booking['employee_first_name'] . ' ' . $booking['employee_last_name'], ENT_QUOTES, 'UTF-8'); ?>
                                                 </td>
                                                 <td class="py-3 px-4 border-b border-gray-200">
                                                     <div><?php echo formatDate($booking['booking_date']); ?></div>
